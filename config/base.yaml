@@ -1,0 +1,55 @@
+# Base configuration — shared defaults for all factory runs
+# Override any field in a stage-specific config (e.g. portuguese.yaml, portuguese_phase2.yaml)
+
+model:
+  name: Qwen/Qwen2.5-7B          # HuggingFace model ID or local path
+                                  # Alternatives (same LoRA target_modules):
+                                  #   Qwen/Qwen2.5-7B-Instruct  (instruction-tuned variant)
+                                  #   Qwen/Qwen3-8B              (newest; 8B, hybrid thinking)
+  load_in_4bit: true              # QLoRA: 4-bit NF4 quantization (fits in 6GB VRAM)
+  bnb_4bit_compute_dtype: bfloat16
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_use_double_quant: true # Double quantization for extra memory savings
+
+lora:
+  r: 64                           # LoRA rank (higher = more capacity, more VRAM)
+  alpha: 128                      # LoRA scaling = alpha / r
+  target_modules:                 # Qwen attention + FFN layers
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  dropout: 0.05
+  bias: none
+  task_type: CAUSAL_LM
+
+training:
+  batch_size: 2                   # Per-device batch size (tight for 6GB)
+  gradient_accumulation_steps: 8  # Effective batch = 2 * 8 = 16 sequences
+  max_seq_len: 1024               # Sequence length (lower saves VRAM)
+  learning_rate: 2.0e-4
+  lr_scheduler: cosine
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  gradient_checkpointing: true    # Required for 6GB VRAM
+  bf16: true
+  fp16: false
+  budget_seconds: 3600            # Default: 1-hour training budget
+  save_steps: 200                 # Save checkpoint every N steps
+  logging_steps: 10
+  output_dir: ./checkpoints
+
+dataset:
+  name: wikipedia-pt              # Registered dataset name (see datasets/registry.py)
+  split: train
+  val_split: 0.005                # 0.5% held out for validation
+  max_samples: null               # null = use full dataset
+  text_column: text               # Column containing the text
+  preprocessing_num_workers: 4
+
+metric:
+  name: perplexity                # Metric used to judge experiment quality
+  lower_is_better: true

@@ -21,3 +21,13 @@ dev/
 
 # Results file
 results.tsv
+
+# Training data (local corpora — not tracked in git)
+training_data/languages/*/
+training_data/domains/*/
+!training_data/languages/README.md
+!training_data/domains/README.md
+
+# Model checkpoints and outputs
+checkpoints/
+models/
