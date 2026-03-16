@@ -22,6 +22,10 @@ dev/
 # Results file
 results.tsv
 
+# Training logs (keep dir, ignore contents)
+logs/*.log
+logs/*.txt
+
 # Training data (local corpora — not tracked in git)
 training_data/languages/*/
 training_data/domains/*/
