@@ -1,0 +1,71 @@
+# Phase 3: Continued fine-tuning from the already adapted Portuguese model
+#
+# Base: ./models/qwen-portuguese-v1  (Qwen2.5-3B merged with v0001 adapter)
+# Starting perplexity (v0001 eval): 6.4463
+#
+# Goal: autonomous hyperparameter search to push perplexity lower.
+# The model already has Portuguese knowledge baked in, so:
+#   - Use a lower base LR (1e-4 vs 2e-4 in phase2) to avoid catastrophic forgetting
+#   - Use a lower LoRA rank (32) — smaller delta on top of already-adapted weights
+#   - Keep seq_len=512 for throughput; autoresearch will also try 1024
+#   - 20-min experiments give ~50-60 gradient steps each — enough to rank candidates
+#
+# Run:
+#   PYTORCH_ALLOC_CONF=expandable_segments:True \
+#   python autoresearch/loop.py \
+#     --config config/portuguese_phase3.yaml \
+#     --total-budget 10800 \
+#     --experiment-budget 1200
+
+model:
+  name: /home/spike/Desktop/autoresearch-slm-factory/models/qwen-portuguese-v1
+  load_in_4bit: true
+  bnb_4bit_compute_dtype: bfloat16
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_use_double_quant: true
+
+lora:
+  r: 32
+  alpha: 64
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  dropout: 0.05
+  bias: none
+  task_type: CAUSAL_LM
+
+training:
+  batch_size: 1
+  gradient_accumulation_steps: 16
+  max_seq_len: 512
+  learning_rate: 1.0e-4             # lower than phase2 — continued fine-tuning
+  lr_scheduler: cosine
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  gradient_checkpointing: true
+  bf16: true
+  fp16: false
+  budget_seconds: 1200              # 20 min per experiment (overridden by --experiment-budget)
+  save_steps: 50
+  logging_steps: 10
+  output_dir: ./checkpoints/qwen-portuguese-phase3
+
+dataset:
+  name: wikipedia-pt
+  split: train
+  val_split: 0.005
+  max_samples: 50000                # fast tokenization; same split as phase1 autoresearch
+  text_column: text
+  preprocessing_num_workers: 4
+
+metric:
+  name: perplexity
+  lower_is_better: true
+
+versioning:
+  store_dir: ./models/qwen-portuguese-phase3-versions

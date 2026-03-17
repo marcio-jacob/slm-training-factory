@@ -55,13 +55,22 @@ def load_model(cfg: ModelConfig, device_map: str = "auto"):
     if cfg.load_in_4bit:
         print("  Quantization: 4-bit NF4 (QLoRA mode)")
 
-    # local_files_only avoids a slow/hanging network check when the model
-    # is already in the HuggingFace cache (~/.cache/huggingface/hub/)
-    _local = Path(cfg.name).exists()  # True for explicit local paths
-    _local_files_only = _local or bool(os.environ.get("TRANSFORMERS_OFFLINE"))
+    # Resolve local paths to absolute so HuggingFace's repo-ID validator
+    # doesn't reject relative paths like "./models/foo".
+    # For absolute local dirs, transformers auto-detects local mode —
+    # passing local_files_only=True alongside it triggers HF's repo-ID
+    # validation which rejects non-HF-style paths.
+    _local_path = Path(cfg.name)
+    _local = _local_path.exists()
+    if _local:
+        model_name_or_path = str(_local_path.resolve())
+        _local_files_only = False   # not needed; transformers detects local dirs
+    else:
+        model_name_or_path = cfg.name
+        _local_files_only = bool(os.environ.get("TRANSFORMERS_OFFLINE"))
 
     tokenizer = AutoTokenizer.from_pretrained(
-        cfg.name,
+        model_name_or_path,
         trust_remote_code=True,
         padding_side="right",
         local_files_only=_local_files_only,
@@ -78,20 +87,20 @@ def load_model(cfg: ModelConfig, device_map: str = "auto"):
         # (quantizes in bf16 on CPU RAM) then .cuda() moves the 4-bit tensors
         # to GPU — uses only ~0.5 bytes/param on the GPU.
         model = AutoModelForCausalLM.from_pretrained(
-            cfg.name,
+            model_name_or_path,
             quantization_config=bnb_config,
             device_map="cpu",
             trust_remote_code=True,
-            local_files_only=_local_files_only,
+            **({"local_files_only": True} if _local_files_only else {}),
         )
         model = model.to("cuda:0")
     else:
         model = AutoModelForCausalLM.from_pretrained(
-            cfg.name,
+            model_name_or_path,
             device_map=device_map,
             trust_remote_code=True,
             torch_dtype=torch.bfloat16,
-            local_files_only=_local_files_only,
+            **({"local_files_only": True} if _local_files_only else {}),
         )
 
     # Required before adding LoRA adapters to a quantized model

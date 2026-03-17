@@ -323,7 +323,9 @@ def _propose_config_delta(history: list, current_config: dict) -> Tuple[Dict, st
         ({"lora": {"r": 32, "alpha": 64}},   "LoRA rank=32"),
         ({"lora": {"r": 64, "alpha": 128}},  "LoRA rank=64 (baseline)"),
         ({"lora": {"r": 128, "alpha": 256}}, "LoRA rank=128 (more capacity)"),
-        # Learning rate
+        # Learning rate — fine-grained low-LR options useful for continued training
+        ({"training": {"learning_rate": 5e-5}}, "LR = 5e-5 (very conservative)"),
+        ({"training": {"learning_rate": 7.5e-5}}, "LR = 7.5e-5"),
         ({"training": {"learning_rate": 1e-4}}, "LR = 1e-4 (conservative)"),
         ({"training": {"learning_rate": 2e-4}}, "LR = 2e-4 (baseline)"),
         ({"training": {"learning_rate": 3e-4}}, "LR = 3e-4 (aggressive)"),
