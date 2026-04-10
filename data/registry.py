@@ -46,3 +46,4 @@ def list_datasets() -> list[str]:
 
 # Import modules so their @register_dataset decorators run
 from data import portuguese  # noqa: E402, F401
+from data import judicial    # noqa: E402, F401

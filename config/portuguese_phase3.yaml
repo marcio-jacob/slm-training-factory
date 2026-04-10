@@ -18,7 +18,7 @@
 #     --experiment-budget 1200
 
 model:
-  name: /home/spike/Desktop/autoresearch-slm-factory/models/qwen-portuguese-v1
+  name: ./models/qwen-portuguese-v1
   load_in_4bit: true
   bnb_4bit_compute_dtype: bfloat16
   bnb_4bit_quant_type: nf4

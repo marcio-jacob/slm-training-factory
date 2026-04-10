@@ -1,0 +1,68 @@
+# Judicial Portuguese: domain adaptation on Brazilian law corpus
+#
+# Base: qwen-portuguese-v1 (Qwen2.5-3B merged with Portuguese Wikipedia adapter)
+# Dataset: judicial-br — CF/88 + CC + CDC + CLT + CPC + CP + CPP + CTN + ECA + LGPD + LINDB
+#
+# Strategy: continued fine-tuning from the Portuguese-fluent base.
+#   - The base already knows Portuguese well (perplexity 6.44 on Wikipedia PT)
+#   - This adapter teaches legal vocabulary, article structure, and Brazilian
+#     statutory language — without overwriting general Portuguese knowledge
+#   - Low LR (5e-5) to specialise without catastrophic forgetting
+#   - r=64 / alpha=128: same rank as the v0001 Wikipedia adapter that worked best
+#   - 3 epochs: dataset is small (~10k docs) so multiple passes are needed
+#   - seq_len=1024: legal articles are longer than Wikipedia snippets
+#
+# Run:
+#   PYTORCH_ALLOC_CONF=expandable_segments:True \
+#   python factory.py --config config/judicial_portuguese.yaml
+
+model:
+  name: ./models/qwen-portuguese-v1
+  load_in_4bit: true
+  bnb_4bit_compute_dtype: bfloat16
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_use_double_quant: true
+
+lora:
+  r: 64
+  alpha: 128
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  dropout: 0.05
+  bias: none
+  task_type: CAUSAL_LM
+
+training:
+  batch_size: 1
+  gradient_accumulation_steps: 16
+  max_seq_len: 512                    # 1024 OOMs on 6GB VRAM; 512 fits most articles
+  learning_rate: 5.0e-5               # conservative — specialise without forgetting
+  lr_scheduler: cosine
+  warmup_ratio: 0.05
+  weight_decay: 0.01
+  gradient_checkpointing: true
+  bf16: true
+  fp16: false
+  budget_seconds: 14400               # 4h — enough for ~3 full passes over the corpus
+  save_steps: 100
+  logging_steps: 20
+  output_dir: ./checkpoints/qwen-judicial
+
+dataset:
+  name: judicial-br
+  val_split: 0.05                     # 5% held-out for perplexity eval
+  text_column: text
+  preprocessing_num_workers: 4
+
+metric:
+  name: perplexity
+  lower_is_better: true
+
+versioning:
+  store_dir: ./models/qwen-judicial-versions
